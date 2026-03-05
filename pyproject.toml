@@ -1,0 +1,17 @@
+[project]
+name = "romance-arena"
+version = "0.1.0"
+description = "LLM Romance Arena MVP"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.115.0",
+  "httpx>=0.27.0",
+  "python-dotenv>=1.0.1",
+  "pydantic>=2.8.0",
+  "sqlite-vec>=0.1.6",
+  "uvicorn>=0.30.0",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
