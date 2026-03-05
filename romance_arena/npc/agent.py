@@ -1,5 +1,19 @@
 from __future__ import annotations
 
+"""NPC 의사결정 에이전트.
+
+책임:
+1. NPC 행동 선택(action)
+2. 상태 변화량(delta) 추론
+3. 장기기억 승격 후보 추출
+4. NPC 턴 텍스트(서술+대사) 생성
+
+설계 포인트:
+- LLM 우선, 실패 시 fallback 허용
+- function-calling payload는 스키마 검증 후만 반영
+- 성격 가중치(policy)로 LLM 행동을 2차 보정
+"""
+
 import random
 from dataclasses import dataclass
 
@@ -19,6 +33,8 @@ from .schemas import (
 
 @dataclass
 class AgentDecision:
+    """NPC 행동 선택 결과."""
+
     action: Action
     reason: str
     dialogue: str
@@ -26,12 +42,16 @@ class AgentDecision:
 
 @dataclass
 class StateDeltaDecision:
+    """상태 변화량 추론 결과."""
+
     deltas: dict[str, int]
     reason: str
 
 
 @dataclass
 class LongTermMemoryDecision:
+    """장기 기억 승격 후보 목록."""
+
     memories: list[dict[str, str | int]]
 
 
@@ -58,6 +78,8 @@ PERSONALITY_WEIGHTS: dict[str, dict[Action, float]] = {
 
 
 class RomanceNPCAgent:
+    """NPC 1명 기준 행동/메모리 추론기."""
+
     def __init__(self, profile: NPCProfile, seed: int = 42) -> None:
         self.profile = profile
         self.random = random.Random(seed)
@@ -71,6 +93,13 @@ class RomanceNPCAgent:
         recent_events: list[str],
         long_term_memory: list[dict],
     ) -> AgentDecision:
+        """NPC 행동을 선택한다.
+
+        동작 순서:
+        1) 성격/상태 기반 policy weight 계산
+        2) LLM function-calling 시도
+        3) 실패 시 정책 기반 fallback 선택
+        """
         policy_weights = self._build_policy_weights(state, player_action, recent_events)
         if self.llm.enabled():
             decision = self._try_llm_function_call(
@@ -94,6 +123,10 @@ class RomanceNPCAgent:
         recent_events: list[str],
         long_term_memory: list[dict],
     ) -> StateDeltaDecision | None:
+        """현재 턴의 상태 변화량(delta) 추론.
+
+        LLM 비활성(mock) 또는 호출 실패 시 `None` 반환.
+        """
         if not self.llm.enabled():
             return None
         system_prompt = """너는 Romance Arena 상태전이 추론기다.
@@ -132,6 +165,12 @@ class RomanceNPCAgent:
         recent_events: list[str],
         recent_long_term: list[dict],
     ) -> LongTermMemoryDecision | None:
+        """장기 기억 승격 후보를 LLM으로 추출한다.
+
+        Returns:
+            - LongTermMemoryDecision: 검증된 후보 목록
+            - None: LLM 미사용/호출 실패
+        """
         if not self.llm.enabled():
             return None
         system_prompt = """
@@ -174,6 +213,12 @@ class RomanceNPCAgent:
         long_term_memory: list[dict],
         policy_weights: dict[Action, float],
     ) -> AgentDecision | None:
+        """NPC 행동 function-calling 경로.
+
+        주의:
+        - action은 허용 목록에 있어야 한다.
+        - dialogue 품질이 낮으면 별도 텍스트 생성으로 재보정한다.
+        """
         system_prompt = '''너는 Romance Arena NPC 의사결정 에이전트다.
                         반드시 function call로만 응답하라.
                         action은 allowed_actions 안에서만 선택한다.
@@ -202,6 +247,7 @@ class RomanceNPCAgent:
 
         if action not in self.profile.npc_actions:
             return None
+        # 성격/상태 policy와 너무 불일치한 action은 보정한다.
         adjusted_action = self._blend_llm_with_policy(action, policy_weights)
         if adjusted_action != action:
             reason = f"{reason} | adjusted_by_personality_policy={adjusted_action.value}"
@@ -214,6 +260,7 @@ class RomanceNPCAgent:
             )
             if regenerated:
                 dialogue = regenerated
+        # 학습 형식(서술 + "대사")으로 강제 정규화.
         dialogue = normalize_scene_dialogue(dialogue)
         return AgentDecision(action=adjusted_action, reason=reason, dialogue=dialogue)
 
@@ -223,6 +270,7 @@ class RomanceNPCAgent:
         player_action: Action,
         policy_weights: dict[Action, float],
     ) -> AgentDecision:
+        """LLM 실패 시 정책 기반 fallback."""
         action = self._weighted_choice(policy_weights)
         reason = "성격 기반 가중치와 현재 상태를 반영한 fallback 정책(action only)."
         dialogue = self._generate_dialogue_with_llm(
@@ -239,11 +287,13 @@ class RomanceNPCAgent:
         player_action: Action,
         recent_events: list[str],
     ) -> dict[Action, float]:
+        """행동 선택 가중치 테이블 생성."""
         weights = self._base_weights()
         self._apply_state_bias(weights, state, player_action, recent_events)
         return weights
 
     def _base_weights(self) -> dict[Action, float]:
+        """성격(personality) priors를 반영한 초기 가중치."""
         base = {a: 1.0 for a in self.profile.npc_actions}
         personality_map = PERSONALITY_WEIGHTS.get(self.profile.personality, {})
         for action in self.profile.npc_actions:
@@ -257,6 +307,7 @@ class RomanceNPCAgent:
         player_action: Action,
         recent_events: list[str],
     ) -> None:
+        """현재 상태/최근 이벤트를 반영해 행동 가중치를 동적으로 조정."""
         if state.trust < 25 and Action.APOLOGIZE in weights:
             weights[Action.APOLOGIZE] *= 2.0
         if state.jealousy > 65:
@@ -282,6 +333,7 @@ class RomanceNPCAgent:
         llm_action: Action,
         policy_weights: dict[Action, float],
     ) -> Action:
+        """LLM action과 policy action을 블렌딩해 최종 action을 선택."""
         max_weight = max(policy_weights.values())
         llm_weight = policy_weights.get(llm_action, 0.0)
         if llm_weight >= max_weight * 0.75:
@@ -290,6 +342,7 @@ class RomanceNPCAgent:
         return self.random.choice(best_actions)
 
     def _weighted_choice(self, weights: dict[Action, float]) -> Action:
+        """가중치 기반 랜덤 샘플링."""
         items = list(weights.items())
         total = sum(max(0.01, w) for _, w in items)
         r = self.random.random() * total
@@ -307,6 +360,7 @@ class RomanceNPCAgent:
         player_action: Action,
         npc_action: Action,
     ) -> str | None:
+        """NPC 턴 텍스트(서술+대사) 생성."""
         if not self.llm.enabled():
             return None
         system_prompt = """너는 연애 시뮬레이션 NPC 턴 텍스트를 생성한다.
@@ -335,6 +389,7 @@ class RomanceNPCAgent:
         return normalize_scene_dialogue(text)
 
     def _build_dialogue(self, action: Action, state: RelationshipState) -> str:
+        """최종 fallback용 템플릿 대사 생성."""
         name = self.profile.name
         if action == Action.APOLOGIZE:
             return f"{name}는 미안한 기색으로 시선을 살짝 낮췄다.\n\"아까는 내가 예민했어. 미안해.\""

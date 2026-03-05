@@ -28,6 +28,7 @@ class SQLiteMemoryStore:
     VECTOR_DIM = 32
 
     def __init__(self, db_path: str | None = None) -> None:
+        """SQLite 연결과 기본 스키마/벡터 인덱스를 초기화한다."""
         if db_path is None:
             root = Path(__file__).resolve().parents[1]
             db_path = str(root / "outputs" / "romance_memory.sqlite3")
@@ -41,6 +42,7 @@ class SQLiteMemoryStore:
         self._init_vector_extension()
 
     def _init_schema(self) -> None:
+        """short/long-term 메모리 테이블 및 인덱스를 생성한다."""
         cur = self.conn.cursor()
         cur.execute(
             """
@@ -80,6 +82,10 @@ class SQLiteMemoryStore:
         self.conn.commit()
 
     def _init_vector_extension(self) -> None:
+        """sqlite-vec 확장 로드 및 벡터 테이블 생성.
+
+        실패해도 본문 기능은 유지하며 lexical 검색으로 fallback한다.
+        """
         if sqlite_vec is None:
             self.vec_enabled = False
             return
@@ -107,6 +113,7 @@ class SQLiteMemoryStore:
         events: list[str],
         state: dict[str, Any],
     ) -> None:
+        """1턴 로그를 short_term_memory에 저장한다."""
         self.conn.execute(
             """
             INSERT INTO short_term_memory(session_id, turn, player_action, npc_action, events_json, state_json)
@@ -124,6 +131,7 @@ class SQLiteMemoryStore:
         self.conn.commit()
 
     def get_recent_events(self, session_id: str, limit: int = 5) -> list[str]:
+        """최근 턴 이벤트 태그를 평탄화해서 반환한다."""
         rows = self.conn.execute(
             """
             SELECT events_json FROM short_term_memory
@@ -154,6 +162,11 @@ class SQLiteMemoryStore:
         turn: int,
         score: int = 1,
     ) -> None:
+        """장기기억을 upsert하고 벡터 인덱스를 동기화한다.
+
+        - 신규 key: INSERT
+        - 기존 key: score/occurrence 누적 UPDATE
+        """
         row = self.conn.execute(
             """
             SELECT id, occurrence, score FROM long_term_memory
@@ -191,6 +204,7 @@ class SQLiteMemoryStore:
         self._upsert_vector(row_id=row_id, text=note)
 
     def list_long_term(self, session_id: str) -> list[dict[str, Any]]:
+        """세션 장기기억 목록을 중요도 순으로 반환한다."""
         rows = self.conn.execute(
             """
             SELECT memory_key, note, score, first_turn, last_turn, occurrence
@@ -203,6 +217,12 @@ class SQLiteMemoryStore:
         return [dict(row) for row in rows]
 
     def retrieve_long_term(self, session_id: str, query_text: str, limit: int = 6) -> list[dict[str, Any]]:
+        """장기기억 retrieval 통합 진입점.
+
+        우선순위:
+        1) 벡터 검색(sqlite-vec)
+        2) lexical fallback
+        """
         if self.vec_enabled:
             try:
                 return self._retrieve_long_term_vector(session_id=session_id, query_text=query_text, limit=limit)
@@ -211,6 +231,7 @@ class SQLiteMemoryStore:
         return self._retrieve_long_term_lexical(session_id=session_id, query_text=query_text, limit=limit)
 
     def _retrieve_long_term_vector(self, *, session_id: str, query_text: str, limit: int) -> list[dict[str, Any]]:
+        """sqlite-vec 기반 의미 유사도 검색."""
         blob = self._serialize_embedding(self._embed(query_text))
         rows = self.conn.execute(
             """
@@ -228,6 +249,7 @@ class SQLiteMemoryStore:
         return [dict(row) for row in rows]
 
     def _retrieve_long_term_lexical(self, *, session_id: str, query_text: str, limit: int) -> list[dict[str, Any]]:
+        """간단 키워드 overlap 기반 lexical 검색."""
         tokens = [t for t in query_text.lower().split() if t]
         rows = self.conn.execute(
             """
@@ -249,6 +271,7 @@ class SQLiteMemoryStore:
         return [item[2] for item in scored[:limit]]
 
     def _upsert_vector(self, *, row_id: int, text: str) -> None:
+        """long_term_memory 레코드와 long_term_vec 임베딩을 동기화한다."""
         if not self.vec_enabled:
             return
         try:
@@ -264,7 +287,10 @@ class SQLiteMemoryStore:
             self.vec_enabled = False
 
     def _embed(self, text: str) -> list[float]:
-        # 외부 모델 의존 없이 deterministic hash embedding 생성.
+        """외부 모델 없이 deterministic hash embedding을 생성한다.
+
+        주의: 품질보다 의존성 최소화/재현성을 위한 임시 임베딩이다.
+        """
         seed = hashlib.sha256(text.encode("utf-8")).digest()
         out: list[float] = []
         for i in range(self.VECTOR_DIM):
@@ -273,10 +299,10 @@ class SQLiteMemoryStore:
         return out
 
     def _serialize_embedding(self, vec: list[float]) -> bytes:
+        """벡터를 sqlite-vec 호환 바이너리로 직렬화한다."""
         if sqlite_vec is not None:
             try:
                 return sqlite_vec.serialize_float32(vec)
             except Exception:
                 pass
         return struct.pack(f"<{len(vec)}f", *vec)
-

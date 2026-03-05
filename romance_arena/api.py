@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+"""FastAPI HTTP 인터페이스.
+
+이 모듈은 in-memory 세션 사전을 사용해 게임 엔진 인스턴스를 관리한다.
+단일 프로세스/개발용 실행을 전제로 하며, 멀티 워커 배포 시 외부 세션 저장소가 필요하다.
+"""
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
@@ -14,22 +20,28 @@ SESSIONS: dict[str, RomanceArenaEngine] = {}
 
 
 class StartRequest(BaseModel):
+    """세션 시작 요청."""
+
     npc_id: str = Field(description="one of: saya, mai")
     session_id: str
 
 
 class TurnRequest(BaseModel):
+    """턴 진행 요청."""
+
     session_id: str
     player_action: Action
 
 
 @app.get("/health")
 def health() -> dict:
+    """헬스체크 엔드포인트."""
     return {"status": "ok"}
 
 
 @app.get("/npcs")
 def list_npcs() -> dict:
+    """선택 가능한 NPC 목록을 반환한다."""
     return {
         "npcs": [
             {
@@ -46,6 +58,7 @@ def list_npcs() -> dict:
 
 @app.post("/start")
 def start(req: StartRequest) -> dict:
+    """세션을 생성하고 초기 상태/행동 공간을 반환한다."""
     profile = NPCS.get(req.npc_id)
     if profile is None:
         raise HTTPException(status_code=400, detail=f"unknown npc_id: {req.npc_id}")
@@ -62,6 +75,7 @@ def start(req: StartRequest) -> dict:
 
 @app.post("/turn")
 def turn(req: TurnRequest) -> dict:
+    """지정 세션에서 1턴을 실행하고 결과를 반환한다."""
     engine = SESSIONS.get(req.session_id)
     if engine is None:
         raise HTTPException(status_code=404, detail="session not found")
@@ -82,6 +96,7 @@ def turn(req: TurnRequest) -> dict:
 
 @app.get("/memory/{session_id}")
 def memory(session_id: str) -> dict:
+    """세션 장기기억 목록을 조회한다."""
     engine = SESSIONS.get(session_id)
     if engine is None:
         raise HTTPException(status_code=404, detail="session not found")

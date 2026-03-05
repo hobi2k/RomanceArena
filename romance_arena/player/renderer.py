@@ -1,9 +1,20 @@
 from __future__ import annotations
 
+"""플레이어 턴 텍스트 fallback 렌더러.
+
+LLM 생성이 불가능한 경우(mock 모드, 네트워크 실패 등) 사용할
+규칙 기반 텍스트 템플릿을 제공한다.
+"""
+
 from ..models import Action
 
 
 def render_player_turn_fallback(action: Action) -> str:
+    """행동별 기본 플레이어 턴 텍스트를 반환한다.
+
+    반환 형식은 항상:
+        `<서술 문장>\\n"<대사 문장>"`
+    """
     if action == Action.TALK:
         return "플레이어는 차분하게 대화를 이어가며 상대의 눈을 바라본다.\n\"오늘은 네 얘기를 더 듣고 싶어.\""
     if action == Action.COMPLIMENT:
@@ -20,4 +31,5 @@ def render_player_turn_fallback(action: Action) -> str:
         return "플레이어는 장난기 어린 표정으로 상대의 반응을 살폈다.\n\"그런 표정이면 더 놀리고 싶어지는데?\""
     if action == Action.IGNORE:
         return "플레이어는 잠시 거리를 두며 시선을 피했다.\n\"지금은 조금 생각할 시간이 필요해.\""
+    # 방어 코드: enum 확장 등으로 매칭 실패 시에도 항상 유효 문자열 반환.
     return "플레이어는 숨을 고르고 차분하게 말을 고르기 시작했다.\n\"천천히 얘기해보자.\""

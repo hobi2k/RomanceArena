@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+"""NPC 관련 function-calling 스키마/검증 유틸.
+
+핵심 원칙:
+1. LLM 출력은 반드시 JSON schema를 통과해야 엔진에 반영한다.
+2. 검증 실패 시 상위 로직에서 fallback 경로로 전환한다.
+3. 장기기억(memory_key)은 저장 안정성을 위해 정규화한다.
+"""
+
 from typing import Any
 
 from ..models import Action
 
 
+# NPC 행동 선택용 tool schema.
 NPC_TOOL_SCHEMA: dict[str, Any] = {
     "name": "choose_npc_action",
     "description": "현재 턴에서 NPC가 수행할 단일 행동을 선택한다.",
@@ -32,6 +41,13 @@ NPC_TOOL_SCHEMA: dict[str, Any] = {
 
 
 def validate_tool_payload(payload: dict[str, Any]) -> tuple[Action, str, str]:
+    """`choose_npc_action` payload를 타입/값 단위로 검증한다.
+
+    Returns:
+        (action, reason, dialogue) 튜플.
+    Raises:
+        ValueError: 필수 필드 누락/형식 불일치/enum 위반 시.
+    """
     action_raw = payload.get("action")
     reason = payload.get("reason")
     dialogue = payload.get("dialogue")
@@ -81,6 +97,10 @@ STATE_DELTA_TOOL_SCHEMA: dict[str, Any] = {
 
 
 def validate_state_delta_payload(payload: dict[str, Any]) -> tuple[dict[str, int], str]:
+    """`choose_state_delta` payload를 검증한다.
+
+    모든 delta는 정수이며 [-10, 10] 범위를 강제한다.
+    """
     keys = [
         "delta_affection",
         "delta_trust",
@@ -139,6 +159,14 @@ LONG_TERM_MEMORY_TOOL_SCHEMA: dict[str, Any] = {
 
 
 def validate_long_term_memory_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """`extract_long_term_memory` payload를 검증/정규화한다.
+
+    동작:
+    - memories 배열만 허용
+    - 항목별 key/note/score 유효성 확인
+    - memory_key를 소문자 + 안전문자(`a-z0-9_-`) 기반으로 정규화
+    - 최대 5개까지만 채택(상위에서 추가로 3개 제한 적용)
+    """
     raw = payload.get("memories")
     if not isinstance(raw, list):
         raise ValueError("memories must be a list")

@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+"""NPC 설정 레지스트리.
+
+이 모듈은 게임에서 선택 가능한 NPC의 정적 설정(성격/시나리오/허용 행동)을 관리한다.
+엔진은 세션 시작 시 `NPCS`에서 프로필을 조회해 NPC 에이전트를 구성한다.
+"""
+
 from dataclasses import dataclass
 
 from ..models import Action
@@ -7,6 +13,8 @@ from ..models import Action
 
 @dataclass(frozen=True)
 class NPCProfile:
+    """NPC 1명의 고정 프로필."""
+
     npc_id: str
     name: str
     personality: str
@@ -16,6 +24,8 @@ class NPCProfile:
     npc_actions: tuple[Action, ...]
 
 
+# npc_id -> 프로필 매핑.
+# 새 NPC를 추가할 때는 여기 엔트리를 추가하면 API/CLI 선택 목록에 자동 반영된다.
 NPCS: dict[str, NPCProfile] = {
     "saya": NPCProfile(
         npc_id="saya",

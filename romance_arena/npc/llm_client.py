@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+"""OpenAI 호환 API 클라이언트.
+
+이 모듈은 NPC 에이전트가 사용하는 공통 LLM 호출 계층이다.
+function-calling(`tools`)과 일반 텍스트 생성을 모두 제공한다.
+"""
+
 import json
 import os
 from typing import Any
@@ -9,7 +15,16 @@ from dotenv import load_dotenv
 
 
 class OpenAICompatFunctionCaller:
-    """OpenAI/vLLM 호환 function-calling 클라이언트."""
+    """OpenAI/vLLM 호환 function-calling 클라이언트.
+
+    환경 변수:
+    - ROMANCE_LLM_MODE: `openai_compat` 또는 `mock`
+    - ROMANCE_LLM_BASE_URL: OpenAI 호환 엔드포인트(`/v1`) 기준 base URL
+    - ROMANCE_LLM_MODEL: 모델 식별자
+    - ROMANCE_LLM_API_KEY: 선택(없어도 로컬 vLLM은 동작 가능)
+    - ROMANCE_LLM_TIMEOUT: 요청 타임아웃(초)
+    - ROMANCE_LLM_RETRIES: 재시도 횟수
+    """
 
     def __init__(self) -> None:
         # openai_compat 모드 사용 시 .env 기반 설정을 우선 로드한다.
@@ -22,6 +37,7 @@ class OpenAICompatFunctionCaller:
         self.max_retries = int(os.getenv("ROMANCE_LLM_RETRIES", "2"))
 
     def enabled(self) -> bool:
+        """실제 API 호출 모드 여부."""
         return self.mode == "openai_compat"
 
     def choose_action_payload(
@@ -31,6 +47,7 @@ class OpenAICompatFunctionCaller:
         user_prompt: str,
         tool_schema: dict[str, Any],
     ) -> dict[str, Any]:
+        """function-calling(JSON tool args) 응답을 받아 dict로 반환한다."""
         if not self.enabled():
             raise RuntimeError("LLM function-calling is disabled (mode != openai_compat).")
 
@@ -79,6 +96,7 @@ class OpenAICompatFunctionCaller:
         temperature: float = 0.6,
         max_tokens: int = 120,
     ) -> str:
+        """일반 텍스트 생성(chat/completions) 결과를 반환한다."""
         if not self.enabled():
             raise RuntimeError("LLM text generation is disabled (mode != openai_compat).")
 
@@ -107,6 +125,7 @@ class OpenAICompatFunctionCaller:
         return text.strip()
 
     def _post_json(self, *, url: str, headers: dict[str, str], body: dict[str, Any]) -> dict[str, Any]:
+        """HTTP POST + JSON 응답 파싱 + 재시도 래퍼."""
         last_error: Exception | None = None
         for _ in range(self.max_retries + 1):
             try:
