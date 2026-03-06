@@ -54,7 +54,7 @@ Ren'Py:
 런처 주요 변수:
 
 - `DATE_SAYA_START_LLM` (`1|0`, 기본 `1`)
-- `DATE_SAYA_LLM_MODEL_PATH` (기본 `date_saya/model_assets/saya_rp_4b_v3`)
+- `DATE_SAYA_LLM_MODEL_PATH` (기본 `date_saya_backend/model_assets/saya_rp_4b_v3`)
 - `DATE_SAYA_LLM_SERVED_MODEL_NAME` (기본 `saya-rp-4b`)
 - `DATE_SAYA_LLM_MAX_MODEL_LEN` (기본 `1536`)
 - `DATE_SAYA_LLM_GPU_UTIL` (기본 `0.85`)

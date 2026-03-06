@@ -57,9 +57,15 @@ class DateWithSayaService:
     """
 
     def __init__(self) -> None:
-        # date_saya 모델 경로를 TTS runtime에 주입한다.
-        os.environ.setdefault("QWEN_MODEL_DIR", str(PROJECT_ROOT / "date_saya" / "model_assets" / "saya_rp_4b_v3"))
-        os.environ.setdefault("TRANS_MODEL_DIR", str(PROJECT_ROOT / "date_saya" / "model_assets" / "qtranslator_1.7b_v2"))
+        # 백엔드 소유 model_assets 경로를 runtime에 주입한다.
+        os.environ.setdefault(
+            "QWEN_MODEL_DIR",
+            str(PROJECT_ROOT / "date_saya_backend" / "model_assets" / "saya_rp_4b_v3"),
+        )
+        os.environ.setdefault(
+            "TRANS_MODEL_DIR",
+            str(PROJECT_ROOT / "date_saya_backend" / "model_assets" / "qtranslator_1.7b_v2"),
+        )
         # vLLM 강제 실패 시 전체가 죽지 않도록 기본은 HF 4bit 경로를 사용.
         os.environ.setdefault("LLM_BACKEND", "hf")
         os.environ.setdefault("LLM_STRICT_VLLM", "0")
