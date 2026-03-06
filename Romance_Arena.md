@@ -1,269 +1,110 @@
-# LLM Romance Arena
-턴제 연애 전략 시뮬레이션 시스템 설계 (구현 반영 버전)
+# Romance Arena 설계 문서 (현재 적용판)
+
+이 문서는 현재 코드 기준으로 `date_saya` + `date_saya_backend` 아키텍처를 설명한다.
 
 ---
 
-## 1. 프로젝트 개요
+## 1. 목표
 
-LLM Romance Arena는 인간 플레이어와 LLM 기반 NPC가 턴 단위로 상호작용하며 관계를 발전시키는 시뮬레이션 시스템이다.  
-플레이어는 자유 텍스트 대신 정해진 액션을 선택하고, NPC는 현재 상태/기억/성격을 기반으로 다음 행동을 결정한다.
-
-현재 구현은 `RomanceArena/romance_arena` 패키지에 반영되어 있다.
-
----
-
-## 2. 현재 구현 범위 (MVP)
-
-1. NPC 2명 시나리오
-- 사야 (`saya`)
-- 마이 (`mai`)
-
-2. 상태 변수
-- `affection`
-- `trust`
-- `interest`
-- `jealousy`
-- `mood`
-- `relationship_stage`
-
-3. 턴 흐름
-- Player Action
-- Environment Update
-- NPC Action (LLM function-calling + personality policy 결합)
-- Environment Update
-- Outcome 평가
-
-4. 기억 시스템
-- SQLite + sqlite-vec 기반 단기/장기 메모리 저장
-
-5. 실행 인터페이스
-- CLI
-- FastAPI (`/start`, `/turn`, `/memory/{session_id}`)
+- Ren'Py 비주얼 노벨 템플릿을 LLM 기반 상호작용 게임으로 전환
+- 사야 NPC의 반응을 실시간 생성
+- 반응 감정에 따라 스프라이트를 전환
+- 플레이어 선택지 또한 LLM이 생성
+- 메모리는 SQLite(+sqlite-vec)로 누적
 
 ---
 
-## 3. 시스템 구조
+## 2. 시스템 구조
 
-```text
-Player Action
-  ↓
-RomanceEnvironment (state transition)
-  ↓
-RomanceNPCAgent
-  ├─ LLM function-calling (openai/vllm compat)
-  ├─ Personality+State policy re-rank
-  └─ Fallback policy (only if LLM path fails)
-  ↓
-NPC Action + Dialogue
-  ↓
-RomanceEnvironment update
-  ↓
-SQLiteMemoryStore update (short/long-term)
-  ↓
-Outcome check (success/failure/ongoing)
-```
+### 2.1 Client (Ren'Py)
 
----
+- 경로: `date_saya/game`
+- 역할:
+  - UI/연출/라벨 진행
+  - API 호출 브릿지(`llm_bridge.rpy`)
+  - 사야 표정 이미지 표시(`neutral_saya`, `smile_saya`, `crying_saya`, `annoyed_saya`)
+  - `wav_path` 수신 시 음성 재생
 
-## 4. Environment
+### 2.2 Backend (FastAPI + LangGraph)
 
-`romance_arena/environment.py`
+- 경로: `date_saya_backend`
+- 역할:
+  - `/start`, `/turn`, `/health` 제공
+  - 턴 그래프 실행
+  - 세션별 메모리 저장/조회
+  - LLM/감정/선택지 생성
+  - 번역/TTS(옵션) 연계
 
-- 상태 값 범위: `1 ~ 100` 클램프
-- `action`은 선택만 담당
-- 상태 증감은 LLM이 `delta_affection/trust/interest/jealousy/mood`로 제안
-- `delta_*` 범위: `-10 ~ 10` 검증
-- `relationship_stage`는 상태 임계치로 자동 계산
+### 2.3 TTS Runtime
 
-관계 단계:
-- `stranger`
-- `acquaintance`
-- `friend`
-- `romantic_interest`
-- `dating`
-- `relationship`
+- 경로: `date_saya_backend/sbv_runtime`
+- ONNX 기반 런타임
+- 백엔드 영역으로 이동 완료(클라이언트 분리)
 
 ---
 
-## 5. Action Space
+## 3. 턴 파이프라인 (LangGraph)
 
-### 5.1 Player Action Space
-
-- `talk`
-- `compliment`
-- `gift`
-- `invite_date`
-- `apologize`
-- `joke`
-- `tease`
-- `ignore`
-
-### 5.2 NPC Action Space
-
-- `talk`
-- `compliment`
-- `tease`
-- `apologize`
-- `ignore`
-- `change_topic`
-- `invite_date`
-
-NPC별 허용 행동 목록은 `npc_configs.py`에서 관리한다.
+1. `context`: 최근 대화 메모리 로드  
+2. `saya`: 사야 서술+대사 생성  
+3. `emotion`: 감정 라벨 추론(`neutral|happy|sad|angry`)  
+4. `player_options`: 플레이어 선택지 3개 생성  
+5. `translate_tts`: 번역/TTS 옵션 호출  
+6. `commit`: 턴 로그 저장
 
 ---
 
-## 6. NPC Agent
+## 4. 메모리
 
-`romance_arena/agent.py`
-
-### 6.1 LLM Function-Calling
-
-- OpenAI/vLLM 호환 `chat/completions` API 사용
-- tool schema: `choose_npc_action`
-- required fields:
-  - `action`
-  - `reason`
-  - `dialogue`
-- schema 검증 + NPC 허용 action 검증 후만 반영
-- LLM action 결과는 성격/상태 정책으로 2차 보정(re-rank) 후 최종 반영
-- `dialogue`가 짧거나 품질이 낮으면 LLM 대사를 추가 생성해 교체
-
-상태 전이용 별도 tool schema:
-- `choose_state_delta`
-- required fields:
-  - `delta_affection`
-  - `delta_trust`
-  - `delta_interest`
-  - `delta_jealousy`
-  - `delta_mood`
-  - `reason`
-
-환경변수:
-- `ROMANCE_LLM_MODE=openai_compat`
-- `ROMANCE_LLM_BASE_URL=http://127.0.0.1:8000/v1`
-- `ROMANCE_LLM_MODEL=Qwen/Qwen2.5-7B-Instruct`
-- `ROMANCE_LLM_API_KEY` (optional)
-- `ROMANCE_LLM_RETRIES` (default 2)
-
-### 6.2 Personality Policy (LLM 공통 적용)
-
-성격 가중치 정책은 fallback 전용이 아니라 LLM 경로에도 공통 적용:
-- `kind` (사야)
-- `tsundere` (마이)
-
-상태/이벤트(예: trust 저하, jealousy 증가, first_argument) 기반으로 행동 가중치를 동적으로 조정한다.
-
-### 6.3 Fallback 사용 조건
-
-아래 경우에만 fallback 사용:
-- function-calling 실패
-- schema 검증 실패
-- 허용 action 위반
-- LLM 응답 타임아웃/재시도 실패
+- DB: `DATE_SAYA_MEMORY_DB` (기본 `date_saya/outputs/date_saya_memory.sqlite3`)
+- 테이블:
+  - `turns`: 세션 턴 로그 저장
+  - `turn_vec`: sqlite-vec 가상 테이블(확장 로드 가능 시)
+- 기본 검색은 최근 턴 문맥 사용, vec는 확장 가능 포인트
 
 ---
 
-## 7. Memory System
+## 5. LLM 연동
 
-`romance_arena/memory_store.py`
-
-SQLite 파일:
-- `outputs/romance_memory.sqlite3`
-
-테이블:
-1. `short_term_memory`
-- 턴별 행동/이벤트/상태 스냅샷 저장
-
-2. `long_term_memory`
-- LLM function-calling 기반 장기기억 승격 저장
-- `extract_long_term_memory` tool schema로 `memory_key/note/score` 추출
-- 세션 시작 시 `first_meeting` 시드는 기본 등록
-
-3. `long_term_vec` (sqlite-vec 가상 테이블)
-- `long_term_memory.note`를 벡터화해 저장
-- retrieval 시 의미 유사도 검색에 사용
-
-검색 우선순위:
-1) sqlite-vec 의미 검색  
-2) 실패 시 lexical fallback
-
-엔진(`engine.py`)에서 턴 종료 시 자동 저장/승격한다.
+- OpenAI-compatible API 사용 (`/v1/chat/completions`)
+- 기본 대상:
+  - `DATE_SAYA_LLM_BASE_URL=http://127.0.0.1:8100/v1`
+  - `DATE_SAYA_LLM_MODEL=saya-rp-4b`
+- LLM 호출 실패 시:
+  - 백엔드는 500을 내지 않고 폴백 텍스트/폴백 선택지 반환
+  - Ren'Py 진행이 멈추지 않도록 보장
 
 ---
 
-## 8. Outcome 규칙
+## 6. 자동 실행 전략
 
-성공 조건:
-- `affection > 85`
-- `trust > 70`
-- `relationship_stage == relationship`
+`date_saya/run_with_backend.sh`가 다음을 처리한다.
 
-실패 조건:
-- `trust < 10` 또는 `jealousy > 80`
+1. (옵션) vLLM 서버 자동 기동  
+2. FastAPI 백엔드 기동  
+3. 헬스체크 통과 후 Ren'Py 실행  
+4. 종료 시 하위 프로세스 정리
 
-그 외:
-- `ongoing`
+이 방식은 Gradio mount와 달리 프로세스는 분리하지만 사용자 입장에선 "한 번에 실행"된다.
 
 ---
 
-## 9. 구현 파일 구조
+## 7. API 스키마 요약
 
-```text
-romance_arena/
-  __init__.py
-  models.py
-  npc/
-    agent.py
-    configs.py
-    llm_client.py
-    schemas.py
-  player/
-    generator.py
-    renderer.py
-  environment/
-    core.py
-  memory_store.py
-  engine.py
-  api.py
-  cli.py
-```
-
----
-
-## 10. 실행 방법
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-```
-
-CLI:
-
-```bash
-python -m romance_arena.cli
-```
-
-API:
-
-```bash
-uvicorn romance_arena.api:app --host 0.0.0.0 --port 8000
-```
-
-주요 API:
-- `GET /npcs`
 - `POST /start`
+  - 입력: `session_id`, `npc_id`
+  - 출력: 세션 시작 상태
 - `POST /turn`
-- `GET /memory/{session_id}`
+  - 입력: `session_id`, `player_action`, `player_text`
+  - 출력:
+    - `saya_narration`, `saya_dialogue`, `emotion`, `image_key`
+    - `player_options`
+    - `translated_dialogue`, `wav_path`
 
 ---
 
-## 11. PokeLLMon 참조 범위
+## 8. 구현 범위 메모
 
-PokeLLMon은 다음 개념을 참고했다.
-- 턴제 에이전트 루프
-- 상태 기반 의사결정
-- 행동 선택 인터페이스 구조
-
-전투 도메인 로직(배틀 규칙/데미지 계산)은 사용하지 않고,  
-연애 도메인 상태 전이와 기억 시스템은 본 프로젝트에서 독립 구현했다.
+- 현재는 사야 1인 중심 시나리오
+- 플레이어 선택지는 모델이 생성하되, Ren'Py 라벨 분기는 점진적으로 확장 예정
+- `romance_arena/`의 기존 전략 배틀 실험 코드는 별도 레거시 참고 대상으로 유지

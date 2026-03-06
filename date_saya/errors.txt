@@ -1,0 +1,11 @@
+﻿I'm sorry, but errors were detected in your script. Please correct the
+errors listed below, and try again.
+
+
+File "game/startvariables.rpy", line 106: invalid syntax
+    define _preferences.show_empty_window = False
+                       ^
+    
+
+Ren'Py Version: Ren'Py 7.3.5.606
+Fri Apr 15 12:18:42 2022

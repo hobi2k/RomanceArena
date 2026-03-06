@@ -1,93 +1,73 @@
-# Romance Arena
+# RomanceArena
 
-`Romance_Arena.md` 기반 MVP 구현.
+현재 메인 실행 대상은 `date_saya`(Ren'Py 클라이언트) + `date_saya_backend`(FastAPI/LangGraph 백엔드) 조합이다.
 
-## 포함 기능
+## 현재 구조
 
-- 2개 NPC 시나리오 (`saya`, `mai`)
-- 공통 상태 관리
-  - `affection`, `trust`, `interest`, `jealousy`, `mood`, `relationship_stage`
-- 턴 구조
-  - Player Action -> Environment Update -> NPC Action -> Environment Update
-- 상태 전이
-  - `action`은 선택만 담당
-  - 상태 변화량은 LLM function-calling의 `delta_*`로 결정 (`-10~10`)
-  - 안전장치로 범위 검증 + 상태값 `1~100` 클램프
-- JSON schema + function-calling
-  - `choose_npc_action` tool schema
-  - OpenAI/vLLM 호환 API 호출(`ROMANCE_LLM_MODE=openai_compat`)
-  - payload validation + 허용 action 검증
-- NPC 성격 기반 행동 전략
-  - personality(`kind` for saya, `tsundere` for mai)별 가중치 정책
-  - 상태/이벤트 기반 동적 bias 적용
-  - LLM 경로에서도 정책 가중치로 action 보정(리랭크)
-- 대사 생성 품질 강화
-  - 기본: LLM function-calling 결과의 `dialogue` 사용
-  - 짧거나 품질이 낮은 경우 LLM으로 대사 재생성
-  - 최종 실패 시에만 템플릿 대사 fallback
-- SQLite 메모리 시스템
-  - 단기 기억: 최근 턴 로그(`short_term_memory`)
-  - 장기 기억: LLM function-calling 기반 승격(`long_term_memory`)
-  - 벡터 인덱스: `sqlite-vec` 기반 `long_term_vec`
-  - 기본 DB: `outputs/romance_memory.sqlite3`
-- API/FastAPI + CLI
+- `date_saya/`
+  - Ren'Py 게임 프로젝트
+  - 화면/라벨/이미지/선택지 UI
+  - `run_with_backend.sh`: Ren'Py 실행 시 백엔드(+옵션 LLM) 자동 기동 런처
+- `date_saya_backend/`
+  - FastAPI API (`/start`, `/turn`, `/health`)
+  - LangGraph 턴 파이프라인
+  - SQLite 메모리 + sqlite-vec(가능 시)
+  - 사야 NPC 응답 생성 + 감정 라벨 + 플레이어 선택지 생성
+  - `sbv_runtime/` ONNX TTS 런타임
+- `romance_arena/`
+  - 초기/실험용 전략 배틀 엔진(레거시 참고 코드)
 
-## 코드 구조
-
-- `romance_arena/player/`: 플레이어 턴 텍스트 생성/렌더링
-- `romance_arena/npc/`: NPC 프로필, 에이전트, LLM 호출, function-calling schema
-- `romance_arena/environment/`: 상태 전이 및 결과 판정
-
-## 실행
+## 실행 (권장)
 
 ```bash
-cd RomanceArena
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
+cd /home/hosung/pytorch-demo/RomanceArena/date_saya
+./run_with_backend.sh
 ```
-
-CLI:
 
 ```bash
-python -m romance_arena.cli
+cd date_saya && ./run_with_backend.sh
 ```
 
-API:
+런처 동작:
+1. (옵션) 로컬 vLLM 서버 시작 (`127.0.0.1:8100`)
+2. FastAPI 백엔드 시작 (`127.0.0.1:8010`)
+3. 헬스체크 통과 후 Ren'Py 실행
+4. 종료 시 백엔드/LLM 프로세스 정리
+
+## 수동 실행
+
+백엔드만:
 
 ```bash
-uvicorn romance_arena.api:app --host 0.0.0.0 --port 8000
+cd /home/hosung/pytorch-demo/RomanceArena
+uv run uvicorn date_saya_backend.api:app --host 0.0.0.0 --port 8010
 ```
 
-LLM function-calling 사용(vLLM/OpenAI 호환):
+Ren'Py:
 
 ```bash
-export ROMANCE_LLM_MODE=openai_compat
-export ROMANCE_LLM_BASE_URL=http://127.0.0.1:8000/v1
-export ROMANCE_LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
-export ROMANCE_LLM_RETRIES=2
+/home/hosung/pytorch-demo/renpy-8.3.0-sdk/renpy.sh /home/hosung/pytorch-demo/RomanceArena/date_saya
 ```
 
-또는 `.env` 파일 사용 (자동 로드):
+## 환경변수
 
-```dotenv
-ROMANCE_LLM_MODE=openai_compat
-ROMANCE_LLM_BASE_URL=http://127.0.0.1:8000/v1
-ROMANCE_LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
-ROMANCE_LLM_API_KEY=
-ROMANCE_LLM_RETRIES=2
-ROMANCE_LLM_TIMEOUT=30
-```
+런처 주요 변수:
 
-주요 엔드포인트:
+- `DATE_SAYA_START_LLM` (`1|0`, 기본 `1`)
+- `DATE_SAYA_LLM_MODEL_PATH` (기본 `date_saya/model_assets/saya_rp_4b_v3`)
+- `DATE_SAYA_LLM_SERVED_MODEL_NAME` (기본 `saya-rp-4b`)
+- `DATE_SAYA_LLM_MAX_MODEL_LEN` (기본 `1536`)
+- `DATE_SAYA_LLM_GPU_UTIL` (기본 `0.85`)
 
-- `GET /npcs`
-- `POST /start`
-- `POST /turn`
-- `GET /memory/{session_id}`
+백엔드 주요 변수:
 
-## 설계 메모
+- `DATE_SAYA_LLM_BASE_URL` (기본 `http://127.0.0.1:8100/v1`)
+- `DATE_SAYA_LLM_MODEL` (기본 `saya-rp-4b`)
+- `DATE_SAYA_MEMORY_DB`
+- `DATE_SAYA_TRANSLATOR_URL` (옵션)
+- `DATE_SAYA_TTS_URL` (옵션)
 
-- PokeLLMon은 에이전트 루프/의사결정 구조 참고 대상으로 보고, 전투 규칙 엔진은 가져오지 않음.
-- Romance domain 상태 전이/단계 규칙은 이 프로젝트에서 독립 구현.
-- 메모리 retrieval은 `sqlite-vec` 우선, 실패 시 lexical fallback으로 동작.
+## 문서
+
+- 설계 문서: [Romance_Arena.md](/home/hosung/pytorch-demo/RomanceArena/Romance_Arena.md)
+- 백엔드 상세: [date_saya_backend/README.md](/home/hosung/pytorch-demo/RomanceArena/date_saya_backend/README.md)
