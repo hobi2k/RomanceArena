@@ -1,4 +1,20 @@
 # each location is designed to hold one love interest, so "park" and "parkA" should be duplicated or edited to fit your own needs.
+
+init python:
+    def _show_saya_sprite(image_key):
+        """사야 표정 스프라이트를 하나만 남기고 교체 표시한다."""
+        renpy.hide("neutral_saya")
+        renpy.hide("smile_saya")
+        renpy.hide("crying_saya")
+        renpy.hide("annoyed_saya")
+        if image_key == "smile_saya":
+            renpy.show("smile_saya")
+        elif image_key == "crying_saya":
+            renpy.show("crying_saya")
+        elif image_key == "annoyed_saya":
+            renpy.show("annoyed_saya")
+        else:
+            renpy.show("neutral_saya")
     
 label park:
     $ renpy.hide_screen("townmap")
@@ -91,14 +107,7 @@ label chattalk:
         $ HP -= 10
         $ _resp = llm_turn("talk", "대화를 이어간다.")
         if _resp:
-            if _resp["image_key"] == "smile_saya":
-                show smile_saya
-            elif _resp["image_key"] == "crying_saya":
-                show crying_saya
-            elif _resp["image_key"] == "annoyed_saya":
-                show annoyed_saya
-            else:
-                show neutral_saya
+            $ _show_saya_sprite(_resp["image_key"])
             if _resp["saya_narration"]:
                 "[_resp['saya_narration']]"
             c "[_resp['saya_dialogue']]"
@@ -120,14 +129,7 @@ label chattalk:
                 if _chosen:
                     $ _resp = llm_turn("talk", _chosen)
                     if _resp:
-                        if _resp["image_key"] == "smile_saya":
-                            show smile_saya
-                        elif _resp["image_key"] == "crying_saya":
-                            show crying_saya
-                        elif _resp["image_key"] == "annoyed_saya":
-                            show annoyed_saya
-                        else:
-                            show neutral_saya
+                        $ _show_saya_sprite(_resp["image_key"])
                         if _resp["saya_narration"]:
                             "[_resp['saya_narration']]"
                         c "[_resp['saya_dialogue']]"
@@ -149,14 +151,7 @@ label chatgift:
         if (curdate == "Saya"):
             $ _resp = llm_turn("gift", "선물을 건넨다.")
             if _resp:
-                if _resp["image_key"] == "smile_saya":
-                    show smile_saya
-                elif _resp["image_key"] == "crying_saya":
-                    show crying_saya
-                elif _resp["image_key"] == "annoyed_saya":
-                    show annoyed_saya
-                else:
-                    show neutral_saya
+                $ _show_saya_sprite(_resp["image_key"])
                 if _resp["saya_narration"]:
                     "[_resp['saya_narration']]"
                 c "[_resp['saya_dialogue']]"
@@ -170,14 +165,7 @@ label chatgift:
         if (curdate == "Saya"):
             $ _resp = llm_turn("gift", "선물을 건넨다.")
             if _resp:
-                if _resp["image_key"] == "smile_saya":
-                    show smile_saya
-                elif _resp["image_key"] == "crying_saya":
-                    show crying_saya
-                elif _resp["image_key"] == "annoyed_saya":
-                    show annoyed_saya
-                else:
-                    show neutral_saya
+                $ _show_saya_sprite(_resp["image_key"])
                 if _resp["saya_narration"]:
                     "[_resp['saya_narration']]"
                 c "[_resp['saya_dialogue']]"
@@ -197,14 +185,7 @@ label chatdate:
         if (curdate == "Saya"):
             $ _resp = llm_turn("invite_date", "데이트를 제안한다.")
             if _resp:
-                if _resp["image_key"] == "smile_saya":
-                    show smile_saya
-                elif _resp["image_key"] == "crying_saya":
-                    show crying_saya
-                elif _resp["image_key"] == "annoyed_saya":
-                    show annoyed_saya
-                else:
-                    show neutral_saya
+                $ _show_saya_sprite(_resp["image_key"])
                 if _resp["saya_narration"]:
                     "[_resp['saya_narration']]"
                 c "[_resp['saya_dialogue']]"
@@ -219,14 +200,7 @@ label chatdate:
             if (curdate == "Saya"):
                 $ _resp = llm_turn("invite_date", "데이트를 제안한다.")
                 if _resp:
-                    if _resp["image_key"] == "smile_saya":
-                        show smile_saya
-                    elif _resp["image_key"] == "crying_saya":
-                        show crying_saya
-                    elif _resp["image_key"] == "annoyed_saya":
-                        show annoyed_saya
-                    else:
-                        show neutral_saya
+                    $ _show_saya_sprite(_resp["image_key"])
                     if _resp["saya_narration"]:
                         "[_resp['saya_narration']]"
                     c "[_resp['saya_dialogue']]"
