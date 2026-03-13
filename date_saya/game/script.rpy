@@ -12,6 +12,7 @@ init:
     #   hide side mc onlayer mcsprite
 
 label start:
+    $ llm_new_game()
     $ renpy.show_screen("nameinput")
     
 label intro:

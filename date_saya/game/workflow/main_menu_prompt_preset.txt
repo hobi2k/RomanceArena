@@ -1,0 +1,5 @@
+Positive prompt:
+best quality, masterpiece, anime visual novel title screen, polished key visual, same character as the reference sprite, preserve Saya's identity, preserve hair color, preserve outfit design, character enlarged on the right side of the frame, upper body and full figure both readable, elegant pose, cinematic lighting, premium menu illustration, left side kept visually open for title logo and menu buttons, clean atmospheric background, refined anime rendering
+
+Negative prompt:
+low quality, blurry, photorealistic, 3d render, flat sprite look, centered composition, character cropped awkwardly, busy left side, malformed hands, extra limbs, deformed anatomy, broken perspective, text, watermark, logo, cluttered menu space

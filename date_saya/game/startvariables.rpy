@@ -102,6 +102,29 @@ init:
         
     transform midleft:
         xalign 0.065 yalign 1.0
+
+    transform saya_stage_pose:
+        xanchor 0.5
+        yanchor 1.0
+        xalign 0.56
+        yalign 1.18
+        zoom 0.58
+
+    image saya_annoyed01 = "saya_annoyed01.png"
+    image saya_annoyed02 = "saya_annoyed02.png"
+    image saya_neutral01 = "saya_neutral01.png"
+    image saya_neutral02 = "saya_neutral02.png"
+    image saya_sad01 = "saya_sad01.png"
+    image saya_smile01 = "saya_smile01.png"
+    image saya_smile02 = "saya_smile02.png"
+    image saya_smile03 = "saya_smile03.png"
+
+    image player_neutral = "player_neutral.png"
+    image player_smile = "player_smile.png"
+    image player_annoyed = "player_annoyed.png"
+    image player_neutral_face = "player_neutral_face.png"
+    image player_smile_face = "player_smile_face.png"
+    image player_annoyed_face = "player_annoyed_face.png"
         
 
 define gui.about = _p("""

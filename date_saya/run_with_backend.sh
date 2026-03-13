@@ -33,6 +33,12 @@ BACKEND_PID=$!
 
 echo "[INFO] Waiting for backend health check ..."
 for _ in $(seq 1 180); do
+  if ! kill -0 "${BACKEND_PID}" 2>/dev/null; then
+    echo "[ERROR] Backend process exited during health check."
+    echo "        Check log: ${BACKEND_LOG}"
+    tail -n 80 "${BACKEND_LOG}" || true
+    exit 1
+  fi
   if python3 - "${BACKEND_URL}" <<'PY'
 import json
 import sys
@@ -73,4 +79,3 @@ fi
 echo "[INFO] Backend ready. Launching Ren'Py ..."
 echo "[INFO] Backend log: ${BACKEND_LOG}"
 "${RENPY_SDK_PATH}/renpy.sh" "${SCRIPT_DIR}"
-

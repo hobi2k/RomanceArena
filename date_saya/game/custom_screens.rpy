@@ -21,10 +21,23 @@ screen statusbar:
         add "UI/UI mirror sleep idle.png" xpos 1002 ypos 32
     
     # this button takes the user right back to the main map, provided theyre not in a cutscene.
+    add "UI/UI mirror face idle.png" xpos 1094 ypos 8
+    add Transform(
+        _resolve_player_ui_sprite(getattr(store, "llm_last_emotion", "neutral")),
+        zoom=1.05,
+        xpos=1124,
+        ypos=38,
+    )
     if (canwarp == True):
-        imagebutton auto "UI/UI mirror face %s.png" action Jump("map") xpos 1094 ypos 8
+        button:
+            xpos 1094
+            ypos 8
+            xsize 172
+            ysize 174
+            background None
+            focus_mask None
+            action Jump("map")
 
-        
 # this is a custom menu that shows your inventory, stats, and relationship points with the datable characters
 screen statsmenu:
     # this background covers the entire screen, so you cant accidentally click somewhere and put a map on top of your menu
@@ -230,7 +243,7 @@ screen mapshop:
     
     # these buttons allow you to talk to the shopkeep and work, which trades HP for money. work sets the HP cost and pay into variables to be used in shopwork.
     imagebutton auto "UI/UI button talk %s.png" action Jump("shoptalk") xpos 485 ypos 100
-    imagebutton auto "UI/UI button work %s.png" action [SetVariable("workHP", 20), SetVariable("workpay", 15 + charm), Jump("shopwork")] xpos 485 ypos 218
+    imagebutton auto "UI/UI button work %s.png" action [SetVariable("workHP", 20), SetVariable("workpay", 15 + intel), Jump("shopwork")] xpos 485 ypos 218
     
     # these buttons are for the purchasable items. they set the "curgift" and price variables that will be used in shopbuy.
     imagebutton auto "UI/UI shop game %s.png" action [SetVariable("curgift", "games"), SetVariable("giftprice", 20), Jump("shopbuy")] xpos 918 ypos 295

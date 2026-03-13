@@ -1,0 +1,5 @@
+Positive prompt:
+best quality, polished anime game interface, elegant painted panel, cool dark palette, soft bluish highlights, subtle magenta accents, refined glossy trim, visual novel ui, delicate decorative edging, understated luxury, clean readable composition, preserve exact layout, preserve exact silhouette
+
+Negative prompt:
+blurry, noisy, distorted text, warped border, asymmetrical frame, low quality, overdesigned, cluttered, photorealistic, 3d plastic, muddy colors, broken geometry, unreadable interface, watermark, logo

@@ -10,6 +10,8 @@ init:
 screen nameinput():
     modal True
     add "UI/UI name base.png" xpos 0 ypos 0
+    add Solid("#cfcfcf") xpos 620 ypos 0 xsize 660 ysize 720
+    add Transform("player_neutral", zoom=0.72, xpos=860, ypos=120)
     
     add "UI/UI name stats base.png" xpos 205 ypos 245
     add "UI/UI name label.png" xpos 355 ypos 175

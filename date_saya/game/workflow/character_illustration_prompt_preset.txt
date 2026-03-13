@@ -1,0 +1,5 @@
+Positive prompt:
+best quality, masterpiece, polished anime character illustration, visual novel key art, refined face, expressive eyes, soft cel shading, elegant anatomy, clean hair rendering, glossy hair highlights, detailed fabric folds, subtle rim light, cool dark palette, premium promotional illustration, full body standing character, keep original pose, keep original outfit, keep original character identity
+
+Negative prompt:
+worst quality, low quality, blurry, photorealistic, 3d render, western comics, chibi, flat sprite shading, thick messy outlines, extra fingers, malformed hands, extra limbs, deformed anatomy, duplicate body parts, cropped feet, cropped head, text, watermark, logo, busy background

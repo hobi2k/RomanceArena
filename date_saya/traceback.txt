@@ -1,44 +1,28 @@
 ﻿I'm sorry, but an uncaught exception occurred.
 
 While running game code:
-  File "game/interact.rpy", line 92, in script
-    $ _resp = llm_turn("talk", "대화를 이어간다.")
-  File "game/interact.rpy", line 92, in <module>
-    $ _resp = llm_turn("talk", "대화를 이어간다.")
-  File "game/llm_bridge.rpy", line 40, in llm_turn
-    data = _llm_post(
-  File "game/llm_bridge.rpy", line 21, in _llm_post
-    with urllib.request.urlopen(req, timeout=15) as resp:
-timeout: timed out
+  File "game/llm_bridge.rpy", line 8, in script
+    init python:
+  File "game/llm_bridge.rpy", line 86, in <module>
+    config.load_json_callbacks.append(_llm_load_json_callback)
+Exception: config.load_json_callbacks is not a known configuration variable.
 
 -- Full Traceback ------------------------------------------------------------
 
 Full traceback:
-  File "game/interact.rpy", line 92, in script
-    $ _resp = llm_turn("talk", "대화를 이어간다.")
+  File "game/llm_bridge.rpy", line 8, in script
+    init python:
   File "/home/hosung/pytorch-demo/renpy-8.3.0-sdk/renpy/ast.py", line 821, in execute
     renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
   File "/home/hosung/pytorch-demo/renpy-8.3.0-sdk/renpy/python.py", line 1178, in py_exec_bytecode
     exec(bytecode, globals, locals)
-  File "game/interact.rpy", line 92, in <module>
-    $ _resp = llm_turn("talk", "대화를 이어간다.")
-  File "game/llm_bridge.rpy", line 40, in llm_turn
-    data = _llm_post(
-  File "game/llm_bridge.rpy", line 21, in _llm_post
-    with urllib.request.urlopen(req, timeout=15) as resp:
-  File "lib/python3.9/urllib/request.py", line 214, in urlopen
-  File "lib/python3.9/urllib/request.py", line 517, in open
-  File "lib/python3.9/urllib/request.py", line 534, in _open
-  File "lib/python3.9/urllib/request.py", line 494, in _call_chain
-  File "lib/python3.9/urllib/request.py", line 1375, in http_open
-  File "lib/python3.9/urllib/request.py", line 1350, in do_open
-  File "lib/python3.9/http/client.py", line 1377, in getresponse
-  File "lib/python3.9/http/client.py", line 320, in begin
-  File "lib/python3.9/http/client.py", line 281, in _read_status
-  File "lib/python3.9/socket.py", line 704, in readinto
-timeout: timed out
+  File "game/llm_bridge.rpy", line 86, in <module>
+    config.load_json_callbacks.append(_llm_load_json_callback)
+  File "/home/hosung/pytorch-demo/renpy-8.3.0-sdk/renpy/defaultstore.py", line 93, in __getattr__
+    raise Exception('config.%s is not a known configuration variable.' % (name))
+Exception: config.load_json_callbacks is not a known configuration variable.
 
 Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39 x86_64
 Ren'Py 8.3.0.24082114
 Date With Saya 1.0
-Sat Mar  7 02:31:04 2026
+Sat Mar  7 19:33:46 2026

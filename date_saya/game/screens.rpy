@@ -4,6 +4,12 @@
 
 init offset = -1
 
+image saya_menu_loop = Movie(
+    size=(1280, 720),
+    play="images/saya_menu.webm",
+    loop=True,
+)
+
 
 ################################################################################
 ## Styles
@@ -376,7 +382,8 @@ screen main_menu():
 
     style_prefix "main_menu"
 
-    add gui.main_menu_background
+    add "images/saya_menu.png"
+    add "saya_menu_loop"
 
     ## This empty frame darkens the main menu.
     frame:
@@ -439,7 +446,8 @@ screen game_menu(title, scroll=None, yinitial=0.0):
     style_prefix "game_menu"
 
     if main_menu:
-        add gui.main_menu_background
+        add "images/saya_menu.png"
+        add "saya_menu_loop"
     else:
         add gui.game_menu_background
 

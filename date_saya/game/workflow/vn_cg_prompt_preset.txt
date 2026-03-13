@@ -1,0 +1,5 @@
+Positive prompt:
+best quality, masterpiece, anime visual novel cg, cinematic story scene, polished anime illustration, character integrated into environment, coherent lighting, expressive mood, refined background painting, elegant composition, emotional storytelling, detailed environment, clean anatomy, soft cel shading, premium visual novel event cg
+
+Negative prompt:
+low quality, blurry, photorealistic, 3d render, flat sprite look, pasted character, bad anatomy, extra limbs, malformed hands, text, watermark, logo, broken perspective, messy composition, deformed background

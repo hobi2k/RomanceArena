@@ -1,0 +1,5 @@
+Positive prompt:
+best quality, masterpiece, anime visual novel sprite, clean lineart, thin colored outlines, soft cel shading, refined face, expressive eyes, elegant proportions, polished skin highlights, subtle rim light, muted cool palette, modern character illustration, full body standing pose, transparent background, keep original outfit, keep original pose, keep original framing
+
+Negative prompt:
+worst quality, low quality, blurry, realistic, photorealistic, 3d render, western comics, chibi, old anime style, thick messy lines, extra fingers, bad hands, extra limbs, deformed anatomy, duplicate body parts, cropped head, cropped feet, text, watermark, logo, background clutter

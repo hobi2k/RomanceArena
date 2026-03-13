@@ -2,7 +2,7 @@
     
 label dateA:
     scene bg room
-    show neutral_saya
+    $ _show_saya_sprite(None, Arel)
     "사야와의 데이트 세션이 시작됐다."
     $ renpy.show_screen("date")
     $ renpy.pause ()
