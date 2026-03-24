@@ -1,110 +1,126 @@
-# Romance Arena 설계 문서 (현재 적용판)
+# Romance Arena 설계 문서 (현재 구현 기준)
 
-이 문서는 현재 코드 기준으로 `date_saya` + `date_saya_backend` 아키텍처를 설명한다.
+이 문서는 `date_saya`(Ren'Py) + `date_saya_backend`(FastAPI/LangGraph) 기준의 현재 구조와 게임 메커니즘을 정의한다.
 
----
+## 1. 설계 목표
 
-## 1. 목표
+- 단순 대화봇이 아닌 **액션 기반 연애 시뮬레이션** 구현.
+- 플레이어 액션(`talk`, `gift`, `invite_date`)마다 다른 판정과 서사 결과를 제공.
+- NPC 감정 상태를 턴 간 유지하고, 그 상태를 다음 판정에 반영.
+- 장기기억을 vec로 저장/검색하여 대화 일관성을 유지.
+- Ren'Py 저장/불러오기와 백엔드 세션 지속성을 일치시킴.
 
-- Ren'Py 비주얼 노벨 템플릿을 LLM 기반 상호작용 게임으로 전환
-- 사야 NPC의 반응을 실시간 생성
-- 반응 감정에 따라 스프라이트를 전환
-- 플레이어 선택지 또한 LLM이 생성
-- 메모리는 SQLite(+sqlite-vec)로 누적
+## 2. 아키텍처
 
----
+### 2.1 Ren'Py 클라이언트 (`date_saya`)
 
-## 2. 시스템 구조
+- UI, 씬 전환, 라벨 흐름 담당.
+- `game/llm_bridge.rpy`에서 백엔드 API 호출.
+- 턴 결과(`emotion`)를 스프라이트(`neutral/smile/crying/annoyed`)에 반영.
+- `player_options`를 메뉴로 표시하고 선택지를 다음 턴 입력으로 사용.
+- 저장 시 `/session/save`, 미저장 새 게임 시작 시 `/session/discard` 연동.
 
-### 2.1 Client (Ren'Py)
+### 2.2 백엔드 (`date_saya_backend`)
 
-- 경로: `date_saya/game`
-- 역할:
-  - UI/연출/라벨 진행
-  - API 호출 브릿지(`llm_bridge.rpy`)
-  - 사야 표정 이미지 표시(`neutral_saya`, `smile_saya`, `crying_saya`, `annoyed_saya`)
-  - `wav_path` 수신 시 음성 재생
+- FastAPI 엔드포인트 제공:
+  - `GET /health`
+  - `POST /start`
+  - `POST /turn`
+  - `POST /session/save`
+  - `POST /session/discard`
+- `runtime.py`에서 vLLM OpenAI 서버 자동 기동/중지 관리.
+- `service.py`에서 액션 판정, LLM 호출, 세션/메모리 갱신 수행.
+- `pipeline.py`에서 LangGraph 턴 파이프라인 실행.
 
-### 2.2 Backend (FastAPI + LangGraph)
+### 2.3 데이터 저장소
 
-- 경로: `date_saya_backend`
-- 역할:
-  - `/start`, `/turn`, `/health` 제공
-  - 턴 그래프 실행
-  - 세션별 메모리 저장/조회
-  - LLM/감정/선택지 생성
-  - 번역/TTS(옵션) 연계
+- 세션 DB: `outputs/sessions.sqlite3`
+  - `sessions(session_id, npc_id, turn, player_name, saved, npc_emotion, updated_at)`
+- 메모리 DB: `outputs/memory/memory.sqlite3`
+  - `chat_turns`: 턴 원문 로그
+  - `memory_candidates`: 후보 기억
+  - `memory_slots`: 승격된 장기기억
+  - `memory_slot_vec`: sqlite-vec 임베딩 인덱스
 
-### 2.3 TTS Runtime
+## 3. 게임 메커니즘
 
-- 경로: `date_saya_backend/sbv_runtime`
-- ONNX 기반 런타임
-- 백엔드 영역으로 이동 완료(클라이언트 분리)
+### 3.1 액션 타입
 
----
+- `talk`: 대화 진행. 기본적으로 관계 진전에 유리한 변화량.
+- `gift`: **LLM function-calling 판정**으로 수용/거절 맥락과 변화량을 결정.
+- `invite_date`: **LLM function-calling 판정**으로 수락/거절을 결정.
 
-## 3. 턴 파이프라인 (LangGraph)
+### 3.2 선물/데이트 판정 설계
 
-1. `context`: 최근 대화 메모리 로드  
-2. `saya`: 사야 서술+대사 생성  
-3. `emotion`: 감정 라벨 추론(`neutral|happy|sad|angry`)  
-4. `player_options`: 플레이어 선택지 3개 생성  
-5. `translate_tts`: 번역/TTS 옵션 호출  
-6. `commit`: 턴 로그 저장
+- `gift`, `invite_date`는 규칙 하드코딩이 아닌 툴 스키마 호출로 판정.
+- 판정 입력:
+  - `player_rel` (관계 단계)
+  - `player_love` (현재 호감도)
+  - `npc_emotion` (직전 턴 감정)
+  - `player_text` (제안 문장)
+- 판정 출력:
+  - `action_result`
+  - `date_accepted` (bool)
+  - `affection_delta` (정수, -10~15)
+- 결과는 Ren'Py에 전달되어:
+  - `date_accepted=True`면 `dateA` 진입
+  - `affection_delta`만큼 `Alove` 반영
 
----
+### 3.3 NPC 감정 상태
 
-## 4. 메모리
+- 매 턴 `saya_narration + saya_dialogue`로 감정 추론(`happy|sad|angry|neutral`).
+- 추론 결과를 세션 DB의 `npc_emotion`에 저장.
+- 다음 턴 판정(특히 `invite_date`) 입력으로 재사용.
 
-- DB: `DATE_SAYA_MEMORY_DB` (기본 `date_saya/outputs/date_saya_memory.sqlite3`)
-- 테이블:
-  - `turns`: 세션 턴 로그 저장
-  - `turn_vec`: sqlite-vec 가상 테이블(확장 로드 가능 시)
-- 기본 검색은 최근 턴 문맥 사용, vec는 확장 가능 포인트
+## 4. 턴 파이프라인 (LangGraph)
 
----
+`pipeline.py`의 실행 순서:
 
-## 5. LLM 연동
+1. `memory`: 현재 발화 기준 vec 장기기억 검색 + 최근 턴 요약 구성
+2. `generate`: 사야 서술/대사 생성 (메모리 + 액션 판정 결과 포함)
+3. `parse`: 서술/대사 분리
+4. `emotion`: 감정 판정
+5. `options`: 다음 플레이어 선택지 3개 생성
 
-- OpenAI-compatible API 사용 (`/v1/chat/completions`)
-- 기본 대상:
-  - `DATE_SAYA_LLM_BASE_URL=http://127.0.0.1:8100/v1`
-  - `DATE_SAYA_LLM_MODEL=saya-rp-4b`
-- LLM 호출 실패 시:
-  - 백엔드는 500을 내지 않고 폴백 텍스트/폴백 선택지 반환
-  - Ren'Py 진행이 멈추지 않도록 보장
+`service.py`에서 그래프 실행 전 액션 판정을 수행하고, 그래프 실행 후 메모리 업데이트를 커밋한다.
 
----
+## 5. 장기기억 체인
 
-## 6. 자동 실행 전략
+`memory_chain.py`는 다음 순서로 동작:
 
-`date_saya/run_with_backend.sh`가 다음을 처리한다.
+1. 턴 저장:
+  - `chat_turns`에 user/assistant 턴 쌍 기록
+2. 후보 추출:
+  - LLM JSON 추출(`type, subject, key, value, confidence, future_impact, emotion_intensity`)
+3. 점수화/승격:
+  - recurrence/novelty 포함 합성 점수 계산
+  - 임계값 이상은 `memory_slots`로 승격
+4. vec 인덱싱:
+  - HashingVectorizer 임베딩을 `memory_slot_vec`에 저장
+5. 검색 주입:
+  - 현재 발화 임베딩으로 유사 슬롯 검색 후 system prompt에 삽입
 
-1. (옵션) vLLM 서버 자동 기동  
-2. FastAPI 백엔드 기동  
-3. 헬스체크 통과 후 Ren'Py 실행  
-4. 종료 시 하위 프로세스 정리
+## 6. 세션/저장 정책
 
-이 방식은 Gradio mount와 달리 프로세스는 분리하지만 사용자 입장에선 "한 번에 실행"된다.
+- `start`:
+  - 새 세션 생성(`saved=False`)
+- Ren'Py 저장:
+  - `/session/save` 호출로 세션 `saved=True`
+- Ren'Py 새 게임:
+  - 기존 미저장 세션이면 `/session/discard`
+- 백엔드 시작 시:
+  - `saved=False` 세션 일괄 삭제
+- Ren'Py 로드:
+  - 저장된 `session_id`로 이어서 진행
 
----
+## 7. 오류 처리 원칙
 
-## 7. API 스키마 요약
+- LLM 핵심 단계(JSON 파싱, tool call)는 실패 시 즉시 오류를 반환한다.
+- 임의 키워드 기반 후처리/강제 치환은 사용하지 않는다.
+- 비정상 출력은 숨기지 않고 원인 파악 가능하게 유지한다.
 
-- `POST /start`
-  - 입력: `session_id`, `npc_id`
-  - 출력: 세션 시작 상태
-- `POST /turn`
-  - 입력: `session_id`, `player_action`, `player_text`
-  - 출력:
-    - `saya_narration`, `saya_dialogue`, `emotion`, `image_key`
-    - `player_options`
-    - `translated_dialogue`, `wav_path`
+## 8. 향후 확장 포인트
 
----
-
-## 8. 구현 범위 메모
-
-- 현재는 사야 1인 중심 시나리오
-- 플레이어 선택지는 모델이 생성하되, Ren'Py 라벨 분기는 점진적으로 확장 예정
-- `romance_arena/`의 기존 전략 배틀 실험 코드는 별도 레거시 참고 대상으로 유지
+- `talk`도 function-calling 판정으로 승격.
+- 다중 NPC(예: 사야/마이) 세션 분리 확장.
+- TTS/번역 파이프라인 재연결 시 `wav_path` 실사용.
